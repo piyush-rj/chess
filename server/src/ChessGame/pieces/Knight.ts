@@ -1,4 +1,5 @@
 import { MoveCoordinates } from "../../types/types";
+import { Board } from "../board/Board";
 import { is_inside_board } from "../chess-game-utils/utils";
 import { Piece } from "./Piece";
 
@@ -8,13 +9,10 @@ export class Knight extends Piece {
     }
 
     // define board type
-    public get_valid_moves(x: number, y: number, board: any): MoveCoordinates[] {
+    public get_valid_moves(x: number, y: number, board: Board): MoveCoordinates[] {
         const moves: { x: number, y: number }[] = [];
         const all_possible_moves: [number, number][] = [
-            [1, -2], [1, 2],
-            [2, 1], [2, -1],
-            [-1, 2], [-1, -2],
-            [-2, 1], [-2, -1]
+            [1, -2], [1, 2], [2, 1], [2, -1], [-1, 2], [-1, -2], [-2, 1], [-2, -1]
         ]
 
         for (const [move_x, move_y] of all_possible_moves) {

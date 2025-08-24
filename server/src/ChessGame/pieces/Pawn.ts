@@ -1,4 +1,5 @@
 import { MoveCoordinates } from "../../types/types";
+import { Board } from "../board/Board";
 import { is_inside_board } from "../chess-game-utils/utils";
 import { Piece } from "./Piece";
 
@@ -12,7 +13,7 @@ export class Pawn extends Piece {
     // for two moves -> check 2 further squares
 
     // define board type here
-    public get_valid_move(x: number, y: number, board: any): MoveCoordinates[] {
+    public get_valid_move(x: number, y: number, board: Board): MoveCoordinates[] {
         const moves: MoveCoordinates[] = [];
 
         const direction = this.color === 'w' ? -1 : 1;

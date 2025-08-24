@@ -1,4 +1,5 @@
 import { MoveCoordinates } from "../../types/types";
+import { Board } from "../board/Board";
 import { is_inside_board } from "../chess-game-utils/utils";
 import { Piece } from "./Piece"
 
@@ -7,7 +8,7 @@ export class Bishop extends Piece {
         super(color, 'b');
     }
 
-    public get_valid_move(x: number, y: number, board: any) {
+    public get_valid_move(x: number, y: number, board: Board): MoveCoordinates[] {
         const all_possible_moves: [number, number][] = [
             [1, 1], [-1, -1], [-1, 1], [1, -1]
         ];
