@@ -1,6 +1,6 @@
 import { Color, Move, MoveCoordinates } from "../../types/types";
 import { Board } from "../board/Board";
-import { Piece } from "../pieces/Piece";
+import { Piece } from "../chess-game/Piece";
 
 export class MoveGenerator {
 

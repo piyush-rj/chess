@@ -1,6 +1,6 @@
 import { Color, GameResult } from '../../types/types';
 import { Board } from '../board/Board';
-import { Piece } from '../pieces/Piece';
+import { Piece } from '../chess-game/Piece';
 import { MoveGenerator } from './MoveGenerator';
 
 export class GameManager {
