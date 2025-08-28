@@ -1,4 +1,4 @@
-import { Piece } from "../ChessGame/chess-game/Piece";
+import { Piece } from "../ChessGame/chess-game-class/Piece";
 
 export type Color = 'white' | 'black';
 export type PieceSymbol = 'K' | 'Q' | 'R' | 'N' | 'B' | 'P';
@@ -39,8 +39,8 @@ export interface GameState {
     currentPlayer: Color,
     gameStatus: GameStatusEnum,
     moveHistory: Move[],
-    whitePlayer: string,
-    blackPlayer: string,
+    whitePlayer: string | undefined,
+    blackPlayer: string | undefined,
 }
 
 

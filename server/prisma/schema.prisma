@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String?  @unique
+  rating    Int      @default(1200)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  whiteGames Game[] @relation("WhitePlayer")
+  blackGames Game[] @relation("BlackPlayer")
+
+  @@map("users")
+}
+
+model Game {
+  id          String     @id @default(cuid())
+  status      GameStatus @default(WAITING)
+  currentTurn Color      @default(WHITE)
+  winner      Color?
+
+  whitePlayerId String?
+  blackPlayerId String?
+  whitePlayer   User?   @relation("WhitePlayer", fields: [whitePlayerId], references: [id])
+  blackPlayer   User?   @relation("BlackPlayer", fields: [blackPlayerId], references: [id])
+
+  boardState Json?
+  moves      Move[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  @@map("games")
+}
+
+model Move {
+  id     String @id @default(cuid())
+  gameId String
+  game   Game   @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  moveNumber Int
+  fromX      Int
+  fromY      Int
+  toX        Int
+  toY        Int
+  piece      PieceType
+  captured   PieceType?
+
+  isCheck     Boolean    @default(false)
+  isCheckmate Boolean    @default(false)
+  isCastle    Boolean    @default(false)
+  isEnPassant Boolean    @default(false)
+  promotion   PieceType?
+
+  createdAt DateTime @default(now())
+
+  @@index([gameId, moveNumber])
+  @@map("moves")
+}
+
+enum GameStatus {
+  WAITING
+  ACTIVE
+  CHECK
+  CHECKMATE
+  STALEMATE
+  DRAW
+  ABANDONED
+}
+
+enum Color {
+  WHITE
+  BLACK
+}
+
+enum PieceType {
+  KING
+  QUEEN
+  ROOK
+  BISHOP
+  KNIGHT
+  PAWN
+}

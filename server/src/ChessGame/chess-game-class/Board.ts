@@ -42,10 +42,6 @@ export class Board {
         return board;
     }
 
-    private get_board() {
-        return this.board;
-    }
-
     public get_piece(x: number, y: number) {
         if (!is_inside_board(x, y)) return;
         return this.board[y]![x];
@@ -63,16 +59,28 @@ export class Board {
 
     public is_opponent_piece(x: number, y: number, color: Color): boolean {
         const piece = this.get_piece(x, y);
-        return piece !== null && piece?.color !== color;
+        if (!piece) {
+            return false;
+        }
+        if (piece.color !== color) {
+            return true;
+        }
+
+        return false;
     }
 
     public is_valid_move(from: Position, to: Position): boolean {
         if (!is_inside_board(to.x, to.y)) return false;
+
         const piece = this.get_piece(from.x, from.y);
         if (!piece) return false;
 
         const targetPiece = this.get_piece(to.x, to.y);
-        return !targetPiece || targetPiece.color !== piece.color;
+        if (!targetPiece) return true;
+
+        if (targetPiece.color !== piece.color) return true;
+
+        return false;
     }
 
     public make_move(from: Position, to: Position): Move | null {
@@ -93,8 +101,24 @@ export class Board {
         };
     }
 
-    public get_board(board: Board) {
+    public get_board() {
         return this.board;
     }
 
+    public clone_board(): Board {
+        const new_board = new Board();
+        for (let y = 0; y < 8; y++) {
+            for (let x = 0; x < 8; x++) {
+                const piece = this.board[y]![x];
+                if (piece) {
+                    const new_piece = Piece.create_piece(piece.color, piece.type);
+                    new_piece.has_moved = piece.has_moved;
+                    new_board.board[y]![x] = new_piece;
+                } else {
+                    new_board.board[y]![x] = null;
+                }
+            }
+        }
+        return new_board
+    }
 }
