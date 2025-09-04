@@ -3,7 +3,7 @@ import { Position, WebSocketMessage } from "../../types/types";
 import { GameManager } from "./GameManager";
 
 export class ChessGameWSHandler {
-    private gameManager = new GameManager();
+    public gameManager = new GameManager();
     private clients = new Map<string, WebSocket>();
 
     public handle_connection(ws: WebSocket, playerId: string): void {
@@ -27,7 +27,7 @@ export class ChessGameWSHandler {
     private handle_message(playerId: string, message: WebSocketMessage): void {
         switch (message.type) {
             case 'init_game':
-                this.handle_init_game(playerId, message.payload);
+                this.handle_init_game(playerId);
                 break;
             case 'join_game':
                 this.handle_join_game(playerId, message.payload);
@@ -43,7 +43,7 @@ export class ChessGameWSHandler {
         }
     }
 
-    private handle_init_game(playerId: string, payload: any): void {
+    private handle_init_game(playerId: string): void {
         const gameId = this.gameManager.create_game();
         const result = this.gameManager.join_game(gameId, playerId);
 
@@ -59,23 +59,60 @@ export class ChessGameWSHandler {
     private handle_join_game(playerId: string, payload: { gameId: string }): void {
         const result = this.gameManager.join_game(payload.gameId, playerId);
 
-        if (result.success) {
-            const game = this.gameManager.get_game(payload.gameId)!;
-            const gameState = game.get_game_state();
+        if (!result.success) {
+            this.send_error_message(playerId, result.error ?? 'join failed');
+            return;
+        }
 
-            // notify all players in the game
-            this.broadcast_to_game(payload.gameId, {
-                type: 'player_joined',
+        const game = this.gameManager.get_game(payload.gameId)!;
+        const gameState = game.get_game_state();
+
+        // send personalized info to white and black players (if they exist)
+        const whiteId = gameState.whitePlayer;
+        const blackId = gameState.blackPlayer;
+
+        if (whiteId) {
+            this.send_message(whiteId, {
+                type: 'player_info',
                 payload: {
+                    yourColor: 'white',
                     gameState,
-                    joiningPlayer: playerId,
-                    ...result.result
+                    message: whiteId === playerId ? 'You joined as white' : 'White player is ready'
                 }
             });
-        } else {
-            this.send_error_message(playerId, result.error!);
+        }
+
+        if (blackId) {
+            this.send_message(blackId, {
+                type: 'player_info',
+                payload: {
+                    yourColor: 'black',
+                    gameState,
+                    message: blackId === playerId ? 'You joined as black' : 'Black player is ready'
+                }
+            });
+        }
+
+        // notify both players that someone joined and share the updated game state
+        this.broadcast_to_game(payload.gameId, {
+            type: 'player_joined',
+            payload: {
+                joiningPlayer: playerId,
+                gameState
+            }
+        });
+
+        // if both players are present, notify that game started
+        if (whiteId && blackId) {
+            this.broadcast_to_game(payload.gameId, {
+                type: 'game_started',
+                payload: {
+                    gameState
+                }
+            });
         }
     }
+
 
     private handle_make_move(playerId: string, payload: { from: Position; to: Position }): void {
         const game = this.gameManager.get_player_game(playerId);

@@ -49,6 +49,7 @@ export class Game {
     }
 
     public make_move(playerId: string, from: Position, to: Position): { success: boolean; move?: Move; error?: string } {
+        console.log("inside make move");
         const playerColor = this.get_player_color(playerId);
         if (!playerColor || playerColor !== this.game_state.currentPlayer) {
             return { success: false, error: 'not your turn' };
@@ -62,6 +63,7 @@ export class Game {
         const validMoves = piece.get_possible_moves(from, this.board);
         const isValidMove = validMoves.some(move => move.x === to.x && move.y === to.y);
 
+        console.log("inside make move 2");
         if (!isValidMove) {
             return { success: false, error: 'invalid move' };
         }
@@ -76,7 +78,7 @@ export class Game {
 
             return { success: true, move };
         }
-
+        console.log("inside make move 3");
         return { success: false, error: 'Move failed' };
     }
 
@@ -145,7 +147,7 @@ export class Game {
                 const piece = board[y]![x];
 
                 if (piece && piece.color === attackerColor) {
-                    const moves = piece.get_possible_moves({x, y}, this.board);
+                    const moves = piece.get_possible_moves({ x, y }, this.board);
                     if (moves.some(m => m.x === position.x && m.y === position.y)) {
                         return true;
                     };
@@ -161,7 +163,7 @@ export class Game {
             for (let x = 0; x < 8; x++) {
                 const piece = board[y]![x];
                 if (piece && piece.type === PieceTypeEnum.KING && piece.color === color) {
-                    return { x, y }; 
+                    return { x, y };
                 }
             }
         }
@@ -177,11 +179,11 @@ export class Game {
                 const piece = board[y]![x];
 
                 if (piece && piece.color === color) {
-                    const moves = piece.get_possible_moves({x, y}, this.board);
+                    const moves = piece.get_possible_moves({ x, y }, this.board);
 
                     for (const move of moves) {
                         const board_clone = this.board.clone_board();
-                        board_clone.make_move({x, y}, move);
+                        board_clone.make_move({ x, y }, move);
                         const king_position = this.get_king_position(color);
 
                         if (king_position && !this.is_square_attacked(king_position, color === 'white' ? 'black' : "white")) {

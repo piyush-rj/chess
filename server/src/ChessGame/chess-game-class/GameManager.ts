@@ -2,9 +2,9 @@ import { Game } from "./Game";
 
 export class GameManager {
     private games = new Map<string, Game>();
-    private playerGameMap =  new Map<string, string>();
+    private playerGameMap = new Map<string, string>();
 
-    constructor() {};
+    constructor() { };
 
     public create_game(gameId?: string) {
         const id = gameId || this.generate_game_id();
@@ -15,7 +15,7 @@ export class GameManager {
 
     public leave_game(player_id: string): void {
         const gameId = this.playerGameMap.get(player_id);
-        if(gameId) {
+        if (gameId) {
             const game = this.games.get(gameId);
             if (game) {
                 game.remove_player(player_id);
@@ -30,25 +30,41 @@ export class GameManager {
         error?: string,
     } {
         const game = this.games.get(gameId);
-        if(!game) {
+        if (!game) {
             return {
-                success: true,
-                error: 'gamenot found'
-            }
+                success: false,
+                error: 'game not found'
+            };
         }
 
         const previousGameId = this.playerGameMap.get(player_id);
-        if(previousGameId) {
+        if (previousGameId) {
             this.leave_game(player_id);
         }
 
-        const result = game.add_player(player_id);
-        this.playerGameMap.set(player_id, gameId);
+        try {
+            const result = game.add_player(player_id);
+            this.playerGameMap.set(player_id, gameId);
 
-        return {
-            success: true,
-            result
+            return {
+                success: true,
+                result
+            };
+        } catch (err: any) {
+            return {
+                success: false,
+                error: err?.message || 'join failed'
+            };
         }
+    }
+
+
+    public get_all_games() {
+        const games_object: { [id: string]: any } = {};
+        this.games.forEach((game, game_id) => {
+            games_object[game_id] = game.get_game_state();
+        });
+        return games_object;
     }
 
     public get_game(gameId: string): Game | undefined {
