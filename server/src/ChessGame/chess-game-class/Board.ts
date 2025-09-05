@@ -48,7 +48,7 @@ export class Board {
     }
 
     private set_piece(x: number, y: number, piece: Piece | null) {
-        if (!is_inside_board(x, y) || !piece) return;
+        if (!is_inside_board(x, y)) return;
         this.board[y]![x] = piece;
         return this.board;
     }

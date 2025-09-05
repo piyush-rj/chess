@@ -54,12 +54,12 @@ export class Game {
         if (!playerColor || playerColor !== this.game_state.currentPlayer) {
             return { success: false, error: 'not your turn' };
         }
-
+        
         const piece = this.board.get_piece(from.x, from.y);
         if (!piece || piece.color !== playerColor) {
             return { success: false, error: 'invalid piece selection' };
         }
-
+        
         const validMoves = piece.get_possible_moves(from, this.board);
         const isValidMove = validMoves.some(move => move.x === to.x && move.y === to.y);
 
