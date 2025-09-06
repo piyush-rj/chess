@@ -6,8 +6,8 @@ export class GameManager {
 
     constructor() { };
 
-    public create_game(gameId?: string) {
-        const id = gameId || this.generate_game_id();
+    public create_game(gameId: string) {
+        const id = gameId!;
         const game = new Game(id);
         this.games.set(id, game);
         return id;
@@ -76,7 +76,7 @@ export class GameManager {
         return gameId ? this.games.get(gameId) : undefined;
     }
 
-    private generate_game_id(): string {
-        return Math.random().toString(36).substring(2, 15);
-    }
+    // private generate_game_id(): string {
+    //     return Math.random().toString(36).substring(2, 15);
+    // }
 }

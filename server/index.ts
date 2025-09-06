@@ -17,9 +17,11 @@ app.use(express.json());
 
 app.use('/api/v1', router);
 
-wss.on('connection', (ws) => {
-    const playerId = uuidv4();
-    ws_handler.handle_connection(ws, playerId);
+wss.on('connection', (ws, req) => {
+    const url = new URL(req.url!, `http://${req.headers.host}`)
+    const playerId = url.searchParams.get('playerId');
+
+    ws_handler.handle_connection(ws, playerId!);
 
     ws.send(JSON.stringify({
         type: 'connection_established',

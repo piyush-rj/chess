@@ -15,7 +15,7 @@ export default function ChessBoard({ board, makeMove, color }: Props) {
     if (!board || board.length === 0) {
         return (
             <div className="w-96 h-96 bg-neutral-300 flex items-center justify-center">
-                <div className="text-lg">Loading board...</div>
+                <div className="text-lg">No player has joined yet</div>
             </div>
         );
     }
@@ -65,7 +65,7 @@ export default function ChessBoard({ board, makeMove, color }: Props) {
                                 className={`
                                     w-12 h-12 flex items-center justify-center cursor-pointer text-3xl 
                                     select-none transition-all duration-200
-                                    ${isDark ? "bg-green-700" : "bg-amber-100"}
+                                    ${isDark ? "bg-amber-800" : "bg-neutral-400"}
                                     ${isSelected ? "ring-4 ring-blue-400 ring-inset" : ""}
                                     ${isPossibleMove ? "ring-2 ring-green-400 ring-inset" : ""}
                                     hover:brightness-110

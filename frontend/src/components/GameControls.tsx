@@ -1,10 +1,11 @@
 "use client";
-
 import useChessSocket from "../hooks/useChessSocket";
 import ChessBoard from "./ChessBoard";
 
 export default function GameControls() {
     const { board, color, gameId, playerId, createGame, joinGame, makeMove } = useChessSocket();
+
+    
 
     return (
         <div className="flex flex-col gap-4 items-center">

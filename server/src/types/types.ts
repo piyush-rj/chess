@@ -19,6 +19,7 @@ export enum GameStatusEnum {
     CHECKMATE = 'CHECKMATE',
     STALEMATE = 'STALEMATE',
     DRAW = 'DRAW',
+    IN_PROGRESS = 'IN_PROGRESS',
 }
 
 export interface Position {
@@ -31,7 +32,9 @@ export interface Move {
     to: Position,
     piece: PieceTypeEnum,
     captured?: PieceTypeEnum,
-    // to add -> promotion, castling, enPassant 
+    isCheck?: boolean,
+    isCheckmate?: boolean,
+    // add more conditions
 }
 
 export interface GameState {
