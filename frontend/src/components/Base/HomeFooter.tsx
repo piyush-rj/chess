@@ -6,7 +6,7 @@ import { useState } from "react";
 
 export default function HomeFooter() {
     const [currentImage, setCurrentImage] = useState<number>(0);
-    const [isPressed, setIsPressed] = useState(false);
+    const [isPressed, setIsPressed] = useState<boolean>(false);
 
     const allImages = ['pfp.jpg', 'dazai.jpeg', 'Gojo.jpeg', 'tanjiro.jpeg'];
 

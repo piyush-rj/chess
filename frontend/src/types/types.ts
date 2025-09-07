@@ -45,4 +45,6 @@ export enum IncomingMessageType {
     MOVE_MADE = 'move_made',
     OPPONENT_JOINED = 'opponene_joined',
     INVALID_MOVE = 'invalid_move',
+    MOVE_FAILED = 'move_failed',
+    GAME_ENDED = 'game_ended',
 }

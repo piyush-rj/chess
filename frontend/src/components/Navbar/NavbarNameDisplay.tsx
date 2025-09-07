@@ -45,7 +45,7 @@ export default function NavbarNameDisplay() {
         };
     }, []);
 
-    const handleLogoutClick = () => {
+    function handleLogoutClick (){
         setPanel(false);
         setShowLogoutModal(true);
     };
