@@ -60,9 +60,9 @@ export class ChessGameWSHandler {
                 await this.handleMakeMove(payload.playerId, payload.from, payload.to);
                 break;
 
-            // case 'game_left':
-            //     await this.handleLeaveGame(ws, payload.playerId, payload.gameId);
-            //     break;
+            case 'game_left':
+                await this.handleLeaveGame(payload.playerId, payload.gameId);
+                break;
 
             default:
                 ws.send(JSON.stringify({ type: "error", payload: "Unknown type" }));
@@ -81,7 +81,6 @@ export class ChessGameWSHandler {
             payload: { gameId: game.gameId, playerColor: result.color },
         }));
     }
-
 
     private async handleJoinGame(ws: WebSocket, playerId: string, gameId: string) {
         const result = await this.gameManager.join_game(gameId, playerId);
@@ -112,8 +111,6 @@ export class ChessGameWSHandler {
         });
     }
 
-
-
     private async handleMakeMove(playerId: string, from: Position, to: Position) {
         console.log("inside make move");
         const game = this.gameManager.get_player_game(playerId);
@@ -141,5 +138,25 @@ export class ChessGameWSHandler {
         });
     }
 
+    private async handleLeaveGame(playerId: string, gameId: string) {
+        const game = this.gameManager.get_player_game(playerId);
+        if (!game) return;
 
+        const gameState = game.get_game_state();
+
+        await this.gameManager.leave_game(playerId);
+        await this.gameManager.end_game(gameId, null);
+
+        [gameState.whitePlayer, gameState.blackPlayer].forEach(pid => {
+            if (pid && this.connectedPlayers.has(pid)) {
+                this.connectedPlayers.get(pid)?.send(JSON.stringify({
+                    type: "game_ended",
+                    payload: {
+                        gameId,
+                        message: `Game has ended because player ${playerId} left.`,
+                    },
+                }));
+            }
+        });
+    }
 }
