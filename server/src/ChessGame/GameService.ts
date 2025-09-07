@@ -1,136 +1,54 @@
-import { PrismaClient } from "@prisma/client";
-import { GameManager } from "../ChessGame/chess-game-class/GameManager";
+import { CreateMoveJob, UpdateGameStateJob, EndGameJob } from "../queue/database-queue";
+import { databaseQueueInstance, redisCacheInstance } from "../services/init-services";
+import { GameStatusEnum, Position } from "../types/websocket-types";
+import { getGameManager } from "./chess-game-singleton/singleton";
 
-const prisma = new PrismaClient();
 
 export class GameService {
-    private gameManager: GameManager;
+    private gameManager = getGameManager();
 
-    constructor(gameManager: GameManager) {
-        this.gameManager = gameManager;
-    }
+    constructor() { }
 
-    async createGame(playerId: string) {
-        const dbGame = await prisma.game.create({
-            data: {
-                whitePlayerId: playerId,
-                status: "WAITING",
-            },
-        });
-        console.log('game created', dbGame);
+    public async createGame(playerId: string) {
+        const game = await this.gameManager.create_game(playerId);
+        const gameId = game.gameId;
 
-        this.gameManager.create_game(dbGame.id);
-        console.log('after creating game in ws');
-        const joinResult = this.gameManager.join_game(dbGame.id, playerId);
+        game.add_player(playerId);
 
-        return { gameId: dbGame.id, ...joinResult };
-    }
-
-    async joinGame(gameId: string, playerId: string) {
-        console.log("gameId received is -----------> ", gameId);
-
-        const dbGame = await prisma.game.findUnique({
-            where: { id: gameId }
+        await redisCacheInstance.set_game(gameId, {
+            gameId,
+            boardState: game.get_game_state().board,
+            currentTurn: game.get_game_state().currentPlayer,
+            status: game.get_game_state().gameStatus,
+            whitePlayerId: playerId,
         });
 
-        if (!dbGame) {
-            return { success: false, error: "Game not found in database" };
-        }
+        const updateJob: UpdateGameStateJob = {
+            gameId,
+            boardState: game.get_game_state().board,
+            currentTurn: game.get_game_state().currentPlayer,
+            status: game.get_game_state().gameStatus,
+        };
+        await databaseQueueInstance.enqueue_update_game_staet(updateJob, {});
 
-        if (dbGame.status !== "WAITING") {
-            return { success: false, error: "Game is not available for joining" };
-        }
-
-        if (dbGame.whitePlayerId === playerId) {
-            return { success: false, error: "Cannot join your own game" };
-        }
-
-        let game = this.gameManager.get_game(gameId);
-        if (!game) {
-            this.gameManager.create_game(gameId);
-            this.gameManager.join_game(gameId, dbGame.whitePlayerId!);
-            game = this.gameManager.get_game(gameId);
-        }
-
-        const result = this.gameManager.join_game(gameId, playerId);
-
-        if (!result.success) {
-            return result;
-        }
-
-        const gameState = this.gameManager.get_game(gameId)!.get_game_state();
-        await prisma.game.update({
-            where: { id: gameId },
-            data: {
-                blackPlayerId: gameState.blackPlayer,
-                status: gameState.gameStatus,
-            },
-        });
-
-        return result;
+        return { gameId, playerColor: "white" };
     }
 
-    async saveMove(
-        playerId: string,
-        gameId: string,
-        from: { x: number; y: number },
-        to: { x: number; y: number }
-    ) {
-        const game = this.gameManager.get_game(gameId);
+    public async joinGame(gameId: string, playerId: string) {
+        const result = await this.gameManager.join_game(gameId, playerId);
+        return result.success ? { success: true, playerColor: result.result.color } : { success: false, error: result.error };
+    }
+
+    public async saveMove(playerId: string, from: Position, to: Position) {
+        const game = this.gameManager.get_player_game(playerId);
         if (!game) return { success: false, error: "game not found" };
 
-        const moveResult = game.make_move(playerId, from, to);
-
-        if (moveResult.success) {
-            const moveCount = await prisma.move.count({ where: { gameId } });
-            const moveNumber = moveCount + 1;
-
-            await prisma.move.create({
-                data: {
-                    gameId,
-                    playerId,
-                    moveNumber,
-                    fromX: from.x,
-                    fromY: from.y,
-                    toX: to.x,
-                    toY: to.y,
-                    piece: moveResult.move!.piece,
-                    captured: moveResult.move?.captured ?? null,
-                    isCheck: moveResult.move?.isCheck ?? false,
-                    isCheckmate: moveResult.move?.isCheckmate ?? false,
-                    // isCastle: moveResult.move?.isCastle ?? false,
-                    // isEnPassant: moveResult.move?.isEnPassant ?? false,
-                    // promotion: moveResult.move?.promotion ?? null,
-                },
-            });
-
-            await prisma.game.update({
-                where: { id: gameId },
-                data: {
-                    status: game.get_game_state().gameStatus,
-                    boardState: serializeBoard(game.get_game_state().board),
-                },
-            });
-        }
-
-        return moveResult;
+        const result = await this.gameManager.make_move(playerId, from, to);
+        return result?.success ? { success: true, move: result.move } : { success: false, error: result?.error };
     }
 
-
-    async getGameState(gameId: string) {
-        return this.gameManager.get_game(gameId)?.get_game_state();
+    public async getGameState(gameId: string) {
+        const game = this.gameManager.get_game(gameId);
+        return game ? game.get_game_state() : null;
     }
-}
-
-function serializeBoard(board: (any | null)[][]) {
-    return board.map(row =>
-        row.map(piece =>
-            piece
-                ? {
-                    type: piece.type,
-                    color: piece.color,
-                }
-                : null
-        )
-    );
 }

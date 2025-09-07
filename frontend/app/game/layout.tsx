@@ -1,4 +1,3 @@
-// app/game/layout.tsx
 import { authOptions } from "@/app/api/auth/[...nextauth]/options";
 import SessionProvider from "@/src/provider/SessionProvider";
 import { WebSocketProvider } from "@/src/provider/WebSocketProvider";

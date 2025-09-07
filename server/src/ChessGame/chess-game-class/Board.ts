@@ -1,4 +1,4 @@
-import { Color, Move, PieceTypeEnum, Position } from "../../types/types";
+import { Color, Move, PieceTypeEnum, Position } from "../../types/websocket-types";
 import { is_inside_board } from "../chess-game-utils/utils";
 import { Piece } from "./Piece";
 
@@ -25,19 +25,15 @@ export class Board {
             PieceTypeEnum.ROOK,
         ];
 
-        for (let i = 0; i < 4; i++) {
-            const j = 7 - i;
-
+        for (let i = 0; i < 8; i++) {
             board[0]![i] = Piece.create_piece("black", piece_order[i]!);
-            board[0]![j] = Piece.create_piece("black", piece_order[j]!);
             board[1]![i] = Piece.create_piece("black", PieceTypeEnum.PAWN);
-            board[1]![j] = Piece.create_piece("black", PieceTypeEnum.PAWN);
 
             board[7]![i] = Piece.create_piece("white", piece_order[i]!);
-            board[7]![j] = Piece.create_piece("white", piece_order[j]!);
             board[6]![i] = Piece.create_piece("white", PieceTypeEnum.PAWN);
-            board[6]![j] = Piece.create_piece("white", PieceTypeEnum.PAWN);
         }
+
+
 
         return board;
     }
@@ -83,11 +79,12 @@ export class Board {
         return false;
     }
 
-    public make_move(from: Position, to: Position): Move | null {
+    public make_move(from: Position, to: Position): Omit<Move, "moveNumber"> | null {
         const piece = this.get_piece(from.x, from.y);
         if (!piece) return null;
 
         const capturedPiece = this.get_piece(to.x, to.y);
+
         this.set_piece(to.x, to.y, piece);
         this.set_piece(from.x, from.y, null);
 
@@ -97,7 +94,7 @@ export class Board {
             from,
             to,
             piece: piece.type,
-            captured: capturedPiece?.type
+            captured: capturedPiece?.type,
         };
     }
 

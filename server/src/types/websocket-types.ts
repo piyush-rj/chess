@@ -20,6 +20,7 @@ export enum GameStatusEnum {
     STALEMATE = 'STALEMATE',
     DRAW = 'DRAW',
     IN_PROGRESS = 'IN_PROGRESS',
+    ENDED = 'ENDED',
 }
 
 export interface Position {
@@ -28,6 +29,7 @@ export interface Position {
 }
 
 export interface Move {
+    moveNumber: number,
     from: Position,
     to: Position,
     piece: PieceTypeEnum,

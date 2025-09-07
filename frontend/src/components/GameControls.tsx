@@ -5,8 +5,6 @@ import ChessBoard from "./ChessBoard";
 export default function GameControls() {
     const { board, color, gameId, playerId, createGame, joinGame, makeMove } = useChessSocket();
 
-    
-
     return (
         <div className="flex flex-col gap-4 items-center">
             <div className="flex gap-2">
@@ -32,7 +30,7 @@ export default function GameControls() {
                 </p>
             )}
 
-            <ChessBoard board={board} makeMove={makeMove} />
+            <ChessBoard board={board} makeMove={makeMove} color={color} />
         </div>
     );
 }

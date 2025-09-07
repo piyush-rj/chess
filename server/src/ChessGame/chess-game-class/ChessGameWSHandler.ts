@@ -1,142 +1,145 @@
-import WebSocket from "ws";
-import { Position, WebSocketMessage } from "../../types/types";
-import { GameManager } from "./GameManager";
-import { GameService } from "../GameService";
+import WebSocket, { WebSocketServer } from "ws";
+import { Position } from "../../types/websocket-types";
+import { getGameManager } from "../chess-game-singleton/singleton";
+import { v4 as uuidv4 } from 'uuid';
+
+interface WSMessage {
+    type: string;
+    payload: any;
+}
 
 export class ChessGameWSHandler {
-    private gameManager = new GameManager();
-    private gameService = new GameService(this.gameManager);
-    private clients = new Map<string, WebSocket>();
+    private gameManager = getGameManager();
+    private connectedPlayers: Map<string, WebSocket> = new Map();
 
-    public handle_connection(ws: WebSocket, playerId: string): void {
-        this.clients.set(playerId, ws);
-
-        ws.on("message", (data: string) => {
-            try {
-                const message: WebSocketMessage = JSON.parse(data);
-                this.handle_message(playerId, message);
-            } catch (error) {
-                this.send_error_message(playerId, "Invalid message format");
+    constructor(private wss: WebSocketServer) {
+        this.wss.on("connection", (ws: WebSocket, req) => {
+            const url = new URL(req.url!, `http://${req.headers.host}`);
+            const playerId = url.searchParams.get("playerId");
+            if (!playerId) {
+                ws.close();
+                return;
             }
-        });
+            this.connectedPlayers.set(playerId, ws);
 
-        ws.on("close", () => {
-            this.gameManager.leave_game(playerId);
-            this.clients.delete(playerId);
+            ws.send(JSON.stringify({
+                type: "connection_established",
+                payload: { playerId },
+            }));
+
+            ws.on("message", (raw: WebSocket.Data) => this.handleMessage(ws, raw));
+            ws.on("close", () => this.handleDisconnect(ws, playerId));
         });
     }
 
-    private async handle_message(playerId: string, message: WebSocketMessage) {
-        switch (message.type) {
-            case "init_game":
-                await this.handle_init_game(playerId);
+    private handleDisconnect(ws: WebSocket, playerId: string) {
+        this.connectedPlayers.delete(playerId);
+        this.gameManager.leave_game(playerId);
+    }
+
+    private async handleMessage(ws: WebSocket, raw: WebSocket.Data) {
+        let message: WSMessage;
+        try {
+            message = JSON.parse(raw.toString());
+        } catch {
+            ws.send(JSON.stringify({ type: "error", payload: "Invalid JSON" }));
+            return;
+        }
+
+        const { type, payload } = message;
+        switch (type) {
+            case "create_game":
+                await this.handleCreateGame(ws, payload.playerId);
                 break;
+
             case "join_game":
-                await this.handle_join_game(playerId, message.payload);
+                await this.handleJoinGame(ws, payload.playerId, payload.gameId);
                 break;
+
             case "make_move":
-                await this.handle_make_move(playerId, message.payload);
+                await this.handleMakeMove(payload.playerId, payload.from, payload.to);
                 break;
-            case "get_valid_moves":
-                this.handle_get_valid_moves(playerId, message.payload);
-                break;
+
+            // case 'game_left':
+            //     await this.handleLeaveGame(ws, payload.playerId, payload.gameId);
+            //     break;
+
             default:
-                this.send_error_message(playerId, "unknown message type");
+                ws.send(JSON.stringify({ type: "error", payload: "Unknown type" }));
         }
     }
 
-    private async handle_init_game(playerId: string) {
-        const result = await this.gameService.createGame(playerId);
+    private async handleCreateGame(ws: WebSocket, playerId: string) {
+        const gameId = uuidv4();
+        const game = await this.gameManager.create_game(gameId, playerId);
 
-        this.send_message(playerId, {
+        const result = { playerId, color: "white" };
+        this.connectedPlayers.set(playerId, ws);
+
+        ws.send(JSON.stringify({
             type: "game_created",
-            payload: { ...result, gameId: result.gameId },
-        });
+            payload: { gameId: game.gameId, playerColor: result.color },
+        }));
     }
 
-    private async handle_join_game(playerId: string, payload: { gameId: string }) {
-        console.log("gameid received is  ------------------> ", payload.gameId);
-        const result = await this.gameService.joinGame(payload.gameId, playerId);
+
+    private async handleJoinGame(ws: WebSocket, playerId: string, gameId: string) {
+        const result = await this.gameManager.join_game(gameId, playerId);
 
         if (!result.success) {
-            this.send_error_message(playerId, result.error ?? "join failed");
+            ws.send(JSON.stringify({ type: "error", payload: result.error }));
             return;
         }
 
-        const gameState = await this.gameService.getGameState(payload.gameId);
+        const playerColor = result.result.color;
 
-        // notify both players
-        this.broadcast_to_game(payload.gameId, {
-            type: "player_joined",
-            payload: { joiningPlayer: playerId, gameState },
+        ws.send(JSON.stringify({
+            type: "game_joined",
+            payload: {
+                gameId,
+                playerColor,
+            },
+        }));
+
+        const gameState = result.gameState;
+        [gameState.whitePlayer, gameState.blackPlayer].forEach(pid => {
+            if (pid && this.connectedPlayers.has(pid)) {
+                this.connectedPlayers.get(pid)?.send(JSON.stringify({
+                    type: "game_state",
+                    payload: gameState,
+                }));
+            }
         });
-
-        if (gameState?.whitePlayer && gameState?.blackPlayer) {
-            this.broadcast_to_game(payload.gameId, {
-                type: "game_started",
-                payload: { gameState },
-            });
-        }
     }
 
-    private async handle_make_move(playerId: string, payload: { from: Position; to: Position }) {
+
+
+    private async handleMakeMove(playerId: string, from: Position, to: Position) {
+        console.log("inside make move");
         const game = this.gameManager.get_player_game(playerId);
-        if (!game) {
-            this.send_error_message(playerId, "not in any game");
-            return;
-        }
-
-        const result = await this.gameService.saveMove(playerId, game.gameId, payload.from, payload.to);
-
-        if (result.success) {
-            this.broadcast_to_game(game.gameId, {
-                type: "move_made",
-                payload: {
-                    move: result.move,
-                    gameState: game.get_game_state(),
-                },
-            });
-        } else {
-            this.send_error_message(playerId, result.error!);
-        }
-    }
-
-    private handle_get_valid_moves(playerId: string, payload: { position: Position }) {
-        const game = this.gameManager.get_player_game(playerId);
-        if (!game) {
-            this.send_error_message(playerId, "not in any game");
-            return;
-        }
-
-        const validMoves = game.get_valid_moves(playerId, payload.position);
-
-        this.send_message(playerId, {
-            type: "valid_moves",
-            payload: { position: payload.position, validMoves },
-        });
-    }
-
-    private send_message(playerId: string, message: any): void {
-        const client = this.clients.get(playerId);
-        if (client) {
-            client.send(JSON.stringify(message));
-        }
-    }
-
-    private send_error_message(playerId: string, error: string): void {
-        this.send_message(playerId, {
-            type: "error",
-            payload: { error },
-        });
-    }
-
-    private broadcast_to_game(gameId: string, message: any): void {
-        const game = this.gameManager.get_game(gameId);
         if (!game) return;
 
+        const result = await this.gameManager.make_move(playerId, from, to);
+        console.log("inside make move 2");
+        if (!result.success) {
+            const ws = this.connectedPlayers.get(playerId);
+            ws?.send(JSON.stringify({
+                type: "move_failed",
+                payload: { error: result.error }
+            }));
+            return;
+        }
+        console.log("inside make move 3");
         const gameState = game.get_game_state();
-        const players = [gameState.whitePlayer, gameState.blackPlayer].filter(Boolean);
-
-        players.forEach((pid) => this.send_message(pid!, message));
+        [gameState.whitePlayer, gameState.blackPlayer].forEach(pid => {
+            if (pid && this.connectedPlayers.has(pid)) {
+                this.connectedPlayers.get(pid)?.send(JSON.stringify({
+                    type: "game_state",
+                    payload: gameState,
+                }));
+            }
+        });
     }
+
+
 }

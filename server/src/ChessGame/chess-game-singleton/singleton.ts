@@ -1,4 +1,10 @@
-import { ChessGameWSHandler } from "../chess-game-class/ChessGameWSHandler";
+import { GameManager } from "../chess-game-class/GameManager";
 
+let gameManagerInstance: GameManager;
 
-export const ws_handler = new ChessGameWSHandler();
+export const getGameManager = (): GameManager => {
+    if (!gameManagerInstance) {
+        gameManagerInstance = new GameManager();
+    }
+    return gameManagerInstance;
+};

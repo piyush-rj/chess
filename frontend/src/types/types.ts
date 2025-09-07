@@ -34,3 +34,15 @@ export interface GameState {
     white_player?: string;
     black_player?: string;
 }
+
+
+export enum IncomingMessageType {
+    GAME_STATE = 'game_state',
+    CONNECTION_ESTABLISHED = 'connection_established',
+    GAME_CREATED = 'game_created',
+    GAME_JOINED = 'game_joined',
+    GAME_LEFT = 'game_left',
+    MOVE_MADE = 'move_made',
+    OPPONENT_JOINED = 'opponene_joined',
+    INVALID_MOVE = 'invalid_move',
+}

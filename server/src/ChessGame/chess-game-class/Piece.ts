@@ -1,4 +1,4 @@
-import { Color, PieceSymbol, PieceTypeEnum, Position } from "../../types/types";
+import { Color, PieceSymbol, PieceTypeEnum, Position } from "../../types/websocket-types";
 import { Board } from "./Board";
 import { is_inside_board } from "../chess-game-utils/utils";
 

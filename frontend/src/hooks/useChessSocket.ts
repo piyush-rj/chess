@@ -1,10 +1,10 @@
 import { useContext, useEffect, useState } from "react";
 import { Piece } from "../lib/boardSetup";
 import { SocketContext } from "../provider/WebSocketProvider";
-// import * as BackendApis from '../backend-utils/BackendAction';
+import { IncomingMessageType } from "../types/types";
 
 export default function useChessSocket() {
-    const ws = useContext(SocketContext);
+    const { lastMessage, send, isConnected } = useContext(SocketContext);
 
     const [gameId, setGameId] = useState<string>("");
     const [board, setBoard] = useState<Piece[][]>([]);
@@ -12,74 +12,57 @@ export default function useChessSocket() {
     const [playerId, setPlayerId] = useState<string>("");
 
     useEffect(() => {
-        if (!ws?.lastMessage) return;
-        const message = ws.lastMessage;
+        if (!lastMessage) return;
 
-        switch (message.type) {
-            case "connection_established":
-                setPlayerId(message.payload.playerId);
+        switch (lastMessage.type) {
+            case IncomingMessageType.GAME_STATE:
+                setBoard(lastMessage.payload.board.board ?? lastMessage.payload.board);
                 break;
 
-            case "game_created":
-            case "game_joined":
-                setGameId(message.payload.gameId);
-                setColor(message.payload.color);
-                if (message.payload.board) setBoard(message.payload.board);
+            case IncomingMessageType.CONNECTION_ESTABLISHED:
+                setPlayerId(lastMessage.payload.playerId);
                 break;
 
-            case "move_made":
-                if (message.payload.board) setBoard(message.payload.board);
-                else if (message.payload.gameState?.board) setBoard(message.payload.gameState.board);
+            case IncomingMessageType.GAME_CREATED:
+                setGameId(lastMessage.payload.gameId);
+                setColor("white");
+                if (lastMessage.payload.board) setBoard(lastMessage.payload.board);
                 break;
 
-            case "player_info":
-            case "player_joined":
-            case "game_started":
-                if (message.payload.gameState?.board) setBoard(message.payload.gameState.board);
+            case IncomingMessageType.GAME_JOINED:
+                setGameId(lastMessage.payload.gameId);
+                setColor(lastMessage.payload.playerColor);
+                if (lastMessage.payload.board) setBoard(lastMessage.payload.board);
                 break;
 
-            case "invalid_move":
-                console.warn("Invalid move:", message.payload.error);
+            case IncomingMessageType.MOVE_MADE:
+                if (lastMessage.payload.boardState) setBoard(lastMessage.payload.boardState);
+                break;
+
+            case IncomingMessageType.OPPONENT_JOINED:
+                console.log("Opponent joined:", lastMessage.payload.playerId);
+                break;
+
+            case IncomingMessageType.INVALID_MOVE:
+                console.warn("Invalid move:", lastMessage.payload.error);
+                break;
+
+            default:
                 break;
         }
-    }, [ws?.lastMessage]);
+    }, [lastMessage]);
 
-
-    async function createGame() {
-        ws?.send({ type: "init_game" });
-        // if(playerId) {
-        //     const data = await BackendApis.createGame(playerId);
-        //     console.log('created game', data);
-        // }
+    function createGame() {
+        send({ type: "create_game", payload: { playerId } });
     }
 
-    async function joinGame(gameId: string) {
-        console.log('game id is ----------> ', gameId);
-        ws?.send({ type: "join_game", payload: { gameId } });
-        // if (playerId) {
-        //     const data = await BackendApis.joinGame(gameId, playerId);
-        //     console.log('join game response', data);
-        // }
+    function joinGame(gameId: string) {
+        send({ type: "join_game", payload: { playerId, gameId } });
     }
 
-    async function makeMove(from: { x: number; y: number }, to: { x: number; y: number }) {
-        ws?.send({ type: "make_move", payload: { from, to } });
-        // if (gameId && playerId) {
-        //     const data = await BackendApis.makeMove(gameId, playerId, from, to);
-        //     console.log('made move response', data);
-        // }
+    function makeMove(from: { x: number; y: number }, to: { x: number; y: number }) {
+        send({ type: "make_move", payload: { playerId, from, to } });
     }
 
-    
-    return {
-        board,
-        setBoard,
-        color,
-        gameId,
-        playerId,
-        isConnected: ws?.isConnected ?? false,
-        createGame,
-        joinGame,
-        makeMove,
-    };
+    return { board, setBoard, color, gameId, playerId, isConnected, createGame, joinGame, makeMove };
 }

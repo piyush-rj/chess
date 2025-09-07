@@ -1,36 +1,19 @@
-import express from 'express';
-import { createServer } from 'http';
-import { WebSocketServer } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
-import router from './src/routes';
-import { ChessGameWSHandler } from './src/ChessGame/chess-game-class/ChessGameWSHandler';
-import { ws_handler } from './src/ChessGame/chess-game-singleton/singleton';
+import express from "express";
+import { createServer } from "http";
+import { WebSocketServer } from "ws";
+import router from "./src/routes";
+import { ChessGameWSHandler } from "./src/ChessGame/chess-game-class/ChessGameWSHandler";
+import { init_services } from "./src/services/init-services";
 
-const PORT = 8080;
+const PORT = process.env.PORT;
 const app = express();
-
 const server = createServer(app);
+init_services();
 
 const wss = new WebSocketServer({ server });
+new ChessGameWSHandler(wss);
 
 app.use(express.json());
+app.use("/api/v1", router);
 
-app.use('/api/v1', router);
-
-wss.on('connection', (ws, req) => {
-    const url = new URL(req.url!, `http://${req.headers.host}`)
-    const playerId = url.searchParams.get('playerId');
-
-    ws_handler.handle_connection(ws, playerId!);
-
-    ws.send(JSON.stringify({
-        type: 'connection_established',
-        payload: { playerId }
-    }));
-});
-
-
-
-server.listen(PORT, () => {
-    console.log(`server running on port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`server running on port ${PORT}`));
