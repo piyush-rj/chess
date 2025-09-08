@@ -24,6 +24,8 @@ export interface UpdateGameStateJob {
     boardState: any;
     currentTurn: Color | string | undefined;
     status: GameStatus | string | undefined;
+    whitePlayerId?: string;
+    blackPlayerId?: string;
 }
 
 export interface EndGameJob {
@@ -60,12 +62,10 @@ export default class DatabaseQueue {
             QueueJobTypes.CREATE_MOVE,
             this.createMoveProcessor.bind(this),
         );
-
         this.databaseQueue.process(
             QueueJobTypes.UPDATE_GAME_STATE,
             this.updateGameStateProcessor.bind(this),
         );
-
         this.databaseQueue.process(
             QueueJobTypes.END_GAME,
             this.endGameProcessor.bind(this),
@@ -73,22 +73,18 @@ export default class DatabaseQueue {
     }
 
     // <-------------------------------- processors -------------------------------->
-
     private async createMoveProcessor(job: Bull.Job) {
         try {
             const data: CreateMoveJob = job.data;
-
             const existing = await prisma.move.findFirst({
                 where: {
                     gameId: data.gameId,
                     moveNumber: data.moveNumber,
                 },
             });
-
             if (existing) {
                 return { success: true, skipped: true };
             }
-
             const created = await prisma.move.create({
                 data: {
                     gameId: data.gameId,
@@ -104,9 +100,7 @@ export default class DatabaseQueue {
                     isCheckmate: !!data.isCheckMate,
                 },
             });
-
             console.log('inside create move 1');
-
             if (data.captured && data.captured.length > 0) {
                 console.log('inside create move 2');
                 const capturedData = data.captured.map((p) => ({
@@ -120,7 +114,6 @@ export default class DatabaseQueue {
                     data: capturedData,
                 })
             }
-
             return { success: true, move: created };
         } catch (error) {
             console.error("Error while processing create move: ", error);
@@ -131,16 +124,25 @@ export default class DatabaseQueue {
     private async updateGameStateProcessor(job: Bull.Job) {
         try {
             const data: UpdateGameStateJob = job.data;
+            
+            const updateData: any = {
+                boardState: data.boardState,
+                currentTurn: data.currentTurn
+                    ? (data.currentTurn.toString().toUpperCase() as Color)
+                    : undefined,
+                status: data.status as GameStatus,
+            };
 
-            await prisma.game.upsert({
+            if (data.whitePlayerId !== undefined) {
+                updateData.whitePlayerId = data.whitePlayerId;
+            }
+            if (data.blackPlayerId !== undefined) {
+                updateData.blackPlayerId = data.blackPlayerId;
+            }
+
+            const response = await prisma.game.upsert({
                 where: { id: data.gameId },
-                update: {
-                    boardState: data.boardState,
-                    currentTurn: data.currentTurn
-                        ? (data.currentTurn.toString().toUpperCase() as Color)
-                        : undefined,
-                    status: data.status as GameStatus,
-                },
+                update: updateData,
                 create: {
                     id: data.gameId,
                     boardState: data.boardState,
@@ -148,9 +150,12 @@ export default class DatabaseQueue {
                         ? (data.currentTurn.toString().toUpperCase() as Color)
                         : "WHITE",
                     status: (data.status as GameStatus) || GameStatus.WAITING,
+                    whitePlayerId: data.whitePlayerId,
+                    blackPlayerId: data.blackPlayerId,
                 },
             });
 
+            console.log("response is ", response);
             return { success: true };
         } catch (error) {
             console.error("Error while processing update game state: ", error);
@@ -161,7 +166,6 @@ export default class DatabaseQueue {
     private async endGameProcessor(job: Bull.Job) {
         try {
             const data: EndGameJob = job.data;
-
             await prisma.game.update({
                 where: { id: data.gameId },
                 data: {
@@ -170,7 +174,6 @@ export default class DatabaseQueue {
                     winner: data.winner as Color,
                 },
             });
-
             return { success: true };
         } catch (error) {
             console.error("Error while processing end game: ", error);
@@ -178,9 +181,7 @@ export default class DatabaseQueue {
         }
     }
 
-
     // <-------------------------------- enqueue calls -------------------------------->
-
     public async createMove(payload: CreateMoveJob, options?: Partial<JobOption>) {
         return this.databaseQueue
             .add(
@@ -219,9 +220,7 @@ export default class DatabaseQueue {
                     moves: { orderBy: { moveNumber: "asc" } },
                 },
             });
-
             if (!game) return null;
-
             return {
                 id: game.id,
                 boardState: game.boardState,

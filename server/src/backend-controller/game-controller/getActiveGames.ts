@@ -5,6 +5,7 @@ import { GameStatus } from "@prisma/client";
 export default async function getActiveGame(req: Request, res: Response) {
     const playerId = req.query.playerId as string;
     console.log("inside get active games");
+
     if (!playerId) {
         res.status(400).json({
             success: false,
@@ -13,7 +14,12 @@ export default async function getActiveGame(req: Request, res: Response) {
         return;
     }
 
+    console.log('playerId is ---------> ', playerId);
+    console.log('playerId type:', typeof playerId);
+
     try {
+        console.log('Searching for games with status:', GameStatus.ACTIVE);
+
         const activeGames = await prisma.game.findMany({
             where: {
                 status: GameStatus.ACTIVE,
@@ -63,25 +69,29 @@ export default async function getActiveGame(req: Request, res: Response) {
             },
         });
 
+        console.log('Found games:', activeGames?.length || 0);
+
         if (!activeGames || activeGames.length === 0) {
-            res.status(404).json({
+            res.status(411).json({
                 success: false,
                 error: 'No games found for this player',
             });
             return;
         }
 
-        res.status(201).json({
+        res.status(200).json({
             success: true,
             activeGames,
         });
         return;
-        
-    } catch (error) {
-        console.error(error);
+
+    } catch (error: any) {
+        console.error('Database error:', error);
         res.status(500).json({
             success: false,
             error: 'Internal server error',
-        })
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+        return;
     }
 }

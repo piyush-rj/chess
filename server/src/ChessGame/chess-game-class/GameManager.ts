@@ -150,6 +150,8 @@ export class GameManager {
                 boardState: game.get_game_state().board,
                 currentTurn: game.get_game_state().currentPlayer,
                 status: game.get_game_state().gameStatus,
+                whitePlayerId: game.get_game_state().whitePlayer!,
+                blackPlayerId: game.get_game_state().blackPlayer!,
             };
             await databaseQueueInstance.updateGameState(payload);
 
