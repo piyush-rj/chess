@@ -1,4 +1,4 @@
-export const BACKEND_URL = process.env.BACKEND_URL + '/api/v1';
+export const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL + '/api/v1';
 
 export const SIGNIN_URL= BACKEND_URL + '/sign-in';
 export const GAME_URL = BACKEND_URL + '/game';

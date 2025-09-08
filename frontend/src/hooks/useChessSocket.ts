@@ -3,9 +3,14 @@ import { useContext, useEffect } from "react";
 import { SocketContext } from "../provider/WebSocketProvider";
 import { IncomingMessageType, Position, WebSocketSendMessage } from "../types/types";
 import { useChessGameStore } from "../store/useChessGameStore";
+import { useUserSessionStore } from "../store/useUserSessionStore";
+import axios from "axios";
+import { GET_ACTIVE_GAME_URL } from "../backend-utils/api-routes";
+import { useActiveGamesStore } from "../store/useActiveGameStore";
 
 export default function useChessSocket() {
     const { lastMessage, send, isConnected } = useContext(SocketContext);
+    const { setActiveGames } = useActiveGamesStore();
     const {
         setPlayerId,
         setGameId,
@@ -17,6 +22,28 @@ export default function useChessSocket() {
         playerId,
         gameState,
     } = useChessGameStore();
+    const { session } = useUserSessionStore();
+
+    useEffect(() => {
+        const fetchActiveGames = async () => {
+            if (!session) return;
+
+            const playerId = session.user.id;
+
+            try {
+                const response = await axios.get(GET_ACTIVE_GAME_URL, {
+                    params: { playerId },
+                });
+
+                if (response.data.success) {
+                    setActiveGames(response.data.activeGames);
+                }
+            } catch (error) {
+                console.error("Error in fetching games: ", error);
+            }
+        };
+        fetchActiveGames();
+    }, [session, setActiveGames]);
 
     useEffect(() => {
         setConnectionStatus(isConnected);

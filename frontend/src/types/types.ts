@@ -47,6 +47,7 @@ export enum IncomingMessageType {
     INVALID_MOVE = 'INVALID_MOVE',
     MOVE_FAILED = 'MOVE_FAILED',
     GAME_ENDED = 'GAME_ENDED',
+    GAME_ACTIVE = 'GAME_ACTIVE',
 }
 
 export enum WebSocketSendMessage {

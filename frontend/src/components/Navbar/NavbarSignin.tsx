@@ -30,7 +30,7 @@ export default function NavbarSignin() {
             ) : (
                 <Button
                     onClick={handleSignIn}
-                    className="hover:-translate-y-0.5 tracking-wide font-sans font-light transition-all transform-3d duration-200 bg-neutral-200 text-black hover:bg-neutral-200 text-sm h-7 flex justify-center items-center w-17"
+                    className="hover:-translate-y-0.5 tracking-wide font-sans font-light transition-all transform-3d duration-200 bg-neutral-200 text-black hover:bg-neutral-200 text-sm h-9 flex justify-center items-center w-20 text-[18px]"
                 >
                     Sign In
                 </Button>

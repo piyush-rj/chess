@@ -1,7 +1,5 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import HomeFooterPieces from "@/src/components/Base/HomeFooterPieces";
-import GameControls from "@/src/components/Game/GameControls";
 import GameFooterProfile from "@/src/components/Game/GameFooterProfile";
 import GameNavbar from "@/src/components/Navbar/GameNavbar";
 import { GridBackgroundDemo } from "@/src/components/ui/GridBackground";
@@ -13,19 +11,22 @@ import { useActiveGamesStore } from "@/src/store/useActiveGameStore";
 import axios from "axios";
 import { GET_ACTIVE_GAME_URL } from "@/src/backend-utils/api-routes";
 import { useUserSessionStore } from "@/src/store/useUserSessionStore";
-import ActiveGamesDisplay from "./AcitveGamesDisplay";
+import GameLayout from "./GameLayout";
+import { useChessGameStore } from "@/src/store/useChessGameStore";
 
 export default function GameMain() {
-    const [panel, setPanel] = useState(false);
-    const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [panel, setPanel] = useState<boolean>(false);
+    const [showLogoutModal, setShowLogoutModal] = useState<boolean>(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const panelRef = useRef<HTMLDivElement>(null);
     const { setActiveGames } = useActiveGamesStore();
     const { session } = useUserSessionStore();
+    const { gameState } = useChessGameStore();
 
     useEffect(() => {
         const fetchActiveGames = async () => {
-            if(!session) return;
+            if (!session) return;
+
             const playerId = session.user.id;
 
             try {
@@ -33,21 +34,16 @@ export default function GameMain() {
                     params: { playerId },
                 });
 
-                console.log("response from backedn is ", response);
-
-                
                 if (response.data.success) {
-                    console.log("data inside response is: ", response.data);
                     setActiveGames(response.data.activeGames);
                 }
-
             } catch (error) {
-                console.error('Error in fetching games: ', error);
+                console.error("Error in fetching games: ", error);
             }
         };
-
         fetchActiveGames();
-    }, [setActiveGames])
+    }, [session, setActiveGames]);
+
 
     useEffect(() => {
         if (!panelRef.current) return;
@@ -99,18 +95,15 @@ export default function GameMain() {
                     <GridBackgroundDemo />
                 </div>
 
-                <div className="w-full h-full px-8 flex justify-center items-center gap-12">
-                    <GameControls />
-                    <ActiveGamesDisplay/>
-                </div>
+                <GameLayout/>
 
                 <div className="absolute bottom-3 left-4">
                     <GameFooterProfile />
                 </div>
 
-                <div className="absolute bottom-3 left-30">
+                {/* <div className="absolute bottom-3 left-30">
                     <HomeFooterPieces />
-                </div>
+                </div> */}
             </div>
 
             {showLogoutModal && (
