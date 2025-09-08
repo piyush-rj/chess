@@ -89,5 +89,6 @@ export enum SendMessageType {
     MOVE_FAILED = 'MOVE_FAILED',
     PLAYER_LEFT = 'PLAYER_LEFT',
     GAME_ENDED = 'GAME_ENDED',
-    GAME_STATE = 'GAME_STATE'
+    GAME_STATE = 'GAME_STATE',
+    GAME_ACTIVE = 'GAME_ACTIVE',
 }

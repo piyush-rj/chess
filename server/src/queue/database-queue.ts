@@ -155,7 +155,6 @@ export default class DatabaseQueue {
                 },
             });
 
-            console.log("response is ", response);
             return { success: true };
         } catch (error) {
             console.error("Error while processing update game state: ", error);

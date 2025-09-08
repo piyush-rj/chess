@@ -177,6 +177,13 @@ export class ChessWebSocketServer {
         });
 
         this.broadcastGameState(gameId);
+
+        // if (result.isActive) {
+        //     this.broadcast(gameId, {
+        //         type: SendMessageType.GAME_ACTIVE,
+        //         payload: result.gameState,
+        //     })
+        // }
     }
 
     private async handleMakeMove(playerId: string, from: Position, to: Position) {

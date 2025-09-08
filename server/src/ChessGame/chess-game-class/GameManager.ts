@@ -123,6 +123,11 @@ export class GameManager {
             }
         }
 
+        const existingGameId = this.player_game_map.get(playerId);
+        if (existingGameId && existingGameId !== gameId) {
+            await this.force_leave_game(playerId, existingGameId);
+        }
+
         const previousGameId = this.player_game_map.get(playerId);
         if (previousGameId) {
             try {
@@ -156,6 +161,9 @@ export class GameManager {
             await databaseQueueInstance.updateGameState(payload);
 
             this.clearCleanupTimer(gameId);
+
+            // const state = game.get_game_state();
+            // const isActive = !!(state.whitePlayer && state.blackPlayer);
 
             return { success: true, result, gameState: game.get_game_state() };
         } catch (err) {
@@ -229,7 +237,7 @@ export class GameManager {
         console.log("captured pieces are ------> ", capturedPieces);
         const formatted = capturedPieces.map(p => ({
             piece: p.piece,
-            capturedBy: p.capturedColor,    
+            capturedBy: p.capturedColor,
         }));
 
         if (formatted.length) {
@@ -362,5 +370,74 @@ export class GameManager {
         for (const [pid, gid] of Array.from(this.player_game_map.entries())) {
             if (gid === gameId) this.player_game_map.delete(pid);
         }
+    }
+
+    private async force_leave_game(playerId: string, gameId: string): Promise<void> {
+        const game = this.games.get(gameId);
+        if (!game) {
+            this.player_game_map.delete(playerId);
+            return;
+        }
+
+        game.remove_player(playerId);
+        this.player_game_map.delete(playerId);
+
+        const state = game.get_game_state();
+
+        if (!state.whitePlayer && !state.blackPlayer) {
+            await this.delete_game_completely(gameId);
+        } else {
+            await this.update_game_state(game);
+        }
+    }
+
+    private async delete_game_completely(gameId: string): Promise<void> {
+        try {
+            this.deleteGameFromMemory(gameId);
+
+            await redisCacheInstance.deleteGame(gameId);
+            await redisCacheInstance.clearCapturedPieces(gameId);
+
+            const endJob: EndGameJob = {
+                gameId,
+                winner: null,
+                endedAt: new Date().toISOString(),
+            };
+            await databaseQueueInstance.endGame(endJob);
+
+        } catch (err) {
+            console.error("Failed to delete game completely:", err);
+        }
+    }
+
+    public get_player_game_id(playerId: string): string | undefined {
+        return this.player_game_map.get(playerId);
+    }
+
+    public is_player_in_game(playerId: string): boolean {
+        return this.player_game_map.has(playerId);
+    }
+
+    private async update_game_state(game: Game): Promise<void> {
+        const state = game.get_game_state();
+
+        await redisCacheInstance.setGame(state.gameId, {
+            gameId: state.gameId,
+            boardState: state.board,
+            currentTurn: state.currentPlayer,
+            status: state.gameStatus,
+            whitePlayerId: state.whitePlayer,
+            blackPlayerId: state.blackPlayer,
+        });
+
+        const payload: UpdateGameStateJob = {
+            gameId: state.gameId,
+            boardState: state.board,
+            currentTurn: state.currentPlayer,
+            status: state.gameStatus,
+            whitePlayerId: state.whitePlayer!,
+            blackPlayerId: state.blackPlayer!,
+        };
+        await databaseQueueInstance.updateGameState(payload);
     }
 }
