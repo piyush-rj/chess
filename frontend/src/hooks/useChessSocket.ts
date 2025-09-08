@@ -1,83 +1,81 @@
 "use client";
 import { useContext, useEffect } from "react";
 import { SocketContext } from "../provider/WebSocketProvider";
-import { IncomingMessageType, Position, GameState } from "../types/types";
-import { use_game_store } from "../store/useChessGameStore";
+import { IncomingMessageType, Position, WebSocketSendMessage } from "../types/types";
+import { useChessGameStore } from "../store/useChessGameStore";
 
 export default function useChessSocket() {
     const { lastMessage, send, isConnected } = useContext(SocketContext);
     const {
-        set_player_id,
-        set_game_id,
-        set_player_color,
-        set_connection_status,
-        set_game_state,
-        reset_game,
-        game_id,
-        player_id,
-        game_state,
-    } = use_game_store();
+        setPlayerId,
+        setGameId,
+        setPlayerColor,
+        setConnectionStatus,
+        setGameState,
+        resetGame,
+        gameId,
+        playerId,
+        gameState,
+    } = useChessGameStore();
 
     useEffect(() => {
-        set_connection_status(isConnected);
-    }, [isConnected, set_connection_status]);
+        setConnectionStatus(isConnected);
+    }, [isConnected, setConnectionStatus]);
 
     useEffect(() => {
         if (!lastMessage) return;
 
+        const normalizeBoard = (boardPayload: any) => {
+            if (!boardPayload) return [];
+            if (Array.isArray(boardPayload)) return boardPayload;
+            if (Array.isArray(boardPayload.board)) return boardPayload.board;
+            return [];
+        };
+
         switch (lastMessage.type) {
             case IncomingMessageType.CONNECTION_ESTABLISHED:
-                set_player_id(lastMessage.payload.playerId);
+                setPlayerId(lastMessage.payload.playerId);
                 break;
 
             case IncomingMessageType.GAME_CREATED:
-                set_game_id(lastMessage.payload.gameId);
-                set_player_color("white");
+                setGameId(lastMessage.payload.gameId);
+                setPlayerColor("WHITE");
                 if (lastMessage.payload.gameState) {
-                    set_game_state(lastMessage.payload.gameState as GameState);
+                    setGameState({
+                        ...lastMessage.payload.gameState,
+                        board: normalizeBoard(lastMessage.payload.gameState.board)
+                    });
                 }
                 break;
 
             case IncomingMessageType.GAME_JOINED:
-                set_game_id(lastMessage.payload.gameId);
-                set_player_color(lastMessage.payload.playerColor);
+                setGameId(lastMessage.payload.gameId);
+                setPlayerColor(lastMessage.payload.playerColor);
                 if (lastMessage.payload.gameState) {
-                    set_game_state(lastMessage.payload.gameState as GameState);
+                    setGameState({
+                        ...lastMessage.payload.gameState,
+                        board: normalizeBoard(lastMessage.payload.gameState.board)
+                    });
                 }
                 break;
 
-            case IncomingMessageType.GAME_STATE: {
+            case IncomingMessageType.GAME_STATE:
                 const payload = lastMessage.payload;
-                const normalizedBoard = payload.board?.board || payload.board;
-
-                set_game_state({
+                setGameState({
                     ...payload,
-                    board: normalizedBoard,
+                    board: normalizeBoard(payload.board),
                 });
                 break;
-            }
-
-            case IncomingMessageType.GAME_CREATED:
-            case IncomingMessageType.GAME_JOINED:
-                const gameState = lastMessage.payload.gameState;
-                if (gameState) {
-                    const normalizedBoard = gameState.board?.board || gameState.board;
-                    set_game_state({
-                        ...gameState,
-                        board: normalizedBoard,
-                    });
-                }
-                break;
-
-
 
             case IncomingMessageType.MOVE_MADE:
-                if (lastMessage.payload.boardState) {
-                    set_game_state({
-                        ...game_state!,
-                        board: lastMessage.payload.boardState,
-                    });
-                }
+                setGameState({
+                    ...gameState!,
+                    board: normalizeBoard(lastMessage.payload.boardState),
+                });
+                // if (lastMessage.payload.capturedPieces) {
+                //     setCapturedPieces(lastMessage.payload.capturedPieces);
+                // }
+                // break;
                 break;
 
             case IncomingMessageType.OPPONENT_JOINED:
@@ -91,7 +89,7 @@ export default function useChessSocket() {
 
             case IncomingMessageType.GAME_ENDED:
                 console.log("Game ended:", lastMessage.payload.message);
-                reset_game();
+                resetGame();
                 break;
 
             default:
@@ -100,23 +98,40 @@ export default function useChessSocket() {
     }, [lastMessage]);
 
     function createGame() {
-        send({ type: "create_game", payload: { playerId: player_id } });
+        send({
+            type: WebSocketSendMessage.CREATE_GAME,
+            payload: { playerId }
+        });
     }
 
     function joinGame(gameId: string) {
-        send({ type: "join_game", payload: { playerId: player_id, gameId } });
+        send({
+            type: WebSocketSendMessage.JOIN_GAME,
+            payload: { playerId, gameId }
+        });
     }
 
     function makeMove(from: Position, to: Position) {
-        send({ type: "make_move", payload: { playerId: player_id, from, to } });
+        send({
+            type: WebSocketSendMessage.MAKE_MOVE,
+            payload: { playerId, from, to }
+        });
     }
 
     function leaveGame() {
-        if (game_id) {
-            send({ type: "game_left", payload: { playerId: player_id, gameId: game_id } });
-            reset_game();
+        if (gameId) {
+            send({
+                type: WebSocketSendMessage.LEAVE_GAME,
+                payload: { playerId, gameId }
+            });
+            resetGame();
         }
     }
 
-    return { createGame, joinGame, makeMove, leaveGame };
+    return {
+        createGame,
+        joinGame,
+        makeMove,
+        leaveGame
+    };
 }

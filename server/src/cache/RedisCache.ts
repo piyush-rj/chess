@@ -1,4 +1,6 @@
+import { Color, PieceType } from "@prisma/client";
 import Redis from "ioredis";
+import { PieceTypeEnum } from "../types/websocket-types";
 
 export type GameCacheValue = {
     gameId: string;
@@ -8,81 +10,141 @@ export type GameCacheValue = {
     whitePlayerId?: string | null;
     blackPlayerId?: string | null;
     updatedAt?: string;
-}
+};
+
+const REDIS_URL = process.env.REDIS_URL;
 
 export default class RedisCache {
-    private redis: Redis;
+    private redisCache: Redis;
 
-    constructor(redisUrl?: string) {
-        const url = redisUrl || process.env.REDIS_URL;
-        this.redis = new Redis(url!);
+    constructor() {
+        this.redisCache = new Redis(REDIS_URL!);
 
-        this.redis.on('error', (err) => console.error('Redis error', err));
-        this.redis.on('connect', () => console.log('Redis connected'));
+        this.redisCache.on("error", (err) =>
+            console.error("Redis error: ", err),
+        );
+        this.redisCache.on("connect", () =>
+            console.log("redis connected successfully"),
+        );
     }
 
     public async setKey(key: string, value: any, ttlSeconds?: number) {
-        const s = JSON.stringify(value);
-        if (ttlSeconds) {
-            await this.redis.set(key, s, 'EX', ttlSeconds);
-        } else {
-            await this.redis.set(key, s);
+        try {
+            const stringified = JSON.stringify(value);
+            if (ttlSeconds) {
+                await this.redisCache.set(key, stringified, "EX", ttlSeconds);
+            } else {
+                await this.redisCache.set(key, stringified);
+            }
+        } catch (error) {
+            console.error(`Error while setting key "${key}" in cache: `, error);
         }
     }
 
     public async getKey<T = any>(key: string): Promise<T | null> {
-        const raw = await this.redis.get(key);
-        if (!raw) return null;
         try {
+            const raw = await this.redisCache.get(key);
+            if (!raw) return null;
             return JSON.parse(raw) as T;
-        } catch (e) {
-            console.error('Failed to parse redis value for key', key, e);
+        } catch (error) {
+            console.error(`Error while getting key "${key}" from cache: `, error);
             return null;
         }
     }
 
     public async delKey(key: string) {
-        await this.redis.del(key);
+        try {
+            await this.redisCache.del(key);
+        } catch (error) {
+            console.error(`Error while deleting key "${key}" from cache: `, error);
+        }
     }
 
-    // -------------------- game helpers --------------------
-    private get_game_key(gameId: string) {
+    // <-------------------------------- game-cache -------------------------------->
+
+    private getGameKey(gameId: string) {
         return `game:${gameId}`;
     }
 
-    public async set_game(gameId: string, value: GameCacheValue) {
-        value.updatedAt = new Date().toISOString();
-        await this.setKey(this.get_game_key(gameId), value);
+    public async setGame(gameId: string, value: GameCacheValue) {
+        try {
+            value.updatedAt = new Date().toISOString();
+            await this.setKey(this.getGameKey(gameId), value);
+        } catch (error) {
+            console.error("Error while setting game in cache: ", error);
+        }
     }
 
-    public async get_game(gameId: string): Promise<GameCacheValue | null> {
-        return this.getKey<GameCacheValue>(this.get_game_key(gameId));
+    public async getGame(gameId: string): Promise<GameCacheValue | null> {
+        try {
+            return await this.getKey<GameCacheValue>(this.getGameKey(gameId));
+        } catch (error) {
+            console.error("Error while getting game from cache: ", error);
+            return null;
+        }
     }
 
-    public async delete_game(gameId: string) {
-        await this.delKey(this.get_game_key(gameId));
+    public async deleteGame(gameId: string) {
+        try {
+            await this.delKey(this.getGameKey(gameId));
+        } catch (error) {
+            console.error("Error while deleting game from cache: ", error);
+        }
     }
 
-    // -------------------- user helpers --------------------
-    private get_user_key(userId: string) {
+    public async addCapturedPieces(gameId: string, pieces: { piece: PieceTypeEnum, capturedBy: Color }[]) {
+        if (!pieces) return;
+        try {
+            const key = `game:${gameId}:capturedPieces`;
+            for (const p of pieces) {
+                await this.redisCache.rpush(key, JSON.stringify(p));
+            }
+        } catch (error) {
+
+        }
+    }
+
+    public async getCapturedPieces(gameId: string) {
+        const key = `game:${gameId}:capturedPieces`;
+        const items = await this.redisCache.lrange(key, 0, 1);
+        return items.map((i: string) => JSON.parse(i));
+    }
+
+    async clearCapturedPieces(gameId: string) {
+        const key = `game:${gameId}:capturedPieces`;
+        await this.redisCache.del(key);
+    }
+
+    // <-------------------------------- users-cache -------------------------------->
+    private getUserKey(userId: string) {
         return `user:${userId}`;
     }
 
-    private async set_user(userId: string, data: any) {
-        await this.setKey(this.get_user_key(userId), data);
+    public async setUser(userId: string, data: any) {
+        try {
+            await this.setKey(this.getUserKey(userId), data);
+        } catch (error) {
+            console.error("Error while setting user in cache: ", error);
+        }
     }
 
-    public async get_user(userId: string) {
-        return this.getKey(this.get_user_key(userId));
+    public async getUser<T = any>(userId: string): Promise<T | null> {
+        try {
+            return await this.getKey<T>(this.getUserKey(userId));
+        } catch (error) {
+            console.error("Error while getting user from cache: ", error);
+            return null;
+        }
     }
 
     public async close() {
         try {
-            await this.redis.quit();
-        } catch (err) {
+            await this.redisCache.quit();
+        } catch (error) {
+            console.warn("Error while closing Redis connection, forcing disconnect");
             try {
-                await this.redis.disconnect();
-            } catch (_) {}
+                await this.redisCache.disconnect();
+            } catch (_) { }
         }
     }
 }

@@ -1,4 +1,4 @@
-export type Color = "white" | "black";
+export type Color = "WHITE" | "BLACK";
 export type PieceType =
     | "KING"
     | "QUEEN"
@@ -37,14 +37,22 @@ export interface GameState {
 
 
 export enum IncomingMessageType {
-    GAME_STATE = 'game_state',
-    CONNECTION_ESTABLISHED = 'connection_established',
-    GAME_CREATED = 'game_created',
-    GAME_JOINED = 'game_joined',
-    GAME_LEFT = 'game_left',
-    MOVE_MADE = 'move_made',
-    OPPONENT_JOINED = 'opponene_joined',
-    INVALID_MOVE = 'invalid_move',
-    MOVE_FAILED = 'move_failed',
-    GAME_ENDED = 'game_ended',
+    GAME_STATE = 'GAME_STATE',
+    CONNECTION_ESTABLISHED = 'CONNECTION_ESTABLISHED',
+    GAME_CREATED = 'GAME_CREATED',
+    GAME_JOINED = 'GAME_JOINED',
+    GAME_LEFT = 'GAME_LEFT',
+    MOVE_MADE = 'MOVE_MADE',
+    OPPONENT_JOINED = 'OPPONENT_JOINED',
+    INVALID_MOVE = 'INVALID_MOVE',
+    MOVE_FAILED = 'MOVE_FAILED',
+    GAME_ENDED = 'GAME_ENDED',
+}
+
+export enum WebSocketSendMessage {
+    CREATE_GAME = 'CREATE_GAME',
+    JOIN_GAME = 'JOIN_GAME',
+    LEAVE_GAME = 'LEAVE_GAME',
+    MAKE_MOVE = 'MAKE_MOVE',
+    RESIGN_GAME = 'RESIGN_GAME',
 }

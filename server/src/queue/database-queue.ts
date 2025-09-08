@@ -1,9 +1,9 @@
-import Bull from 'bull';
-import { PrismaClient, PieceType, Color, GameStatus } from '@prisma/client';
-import { QueueJobTypes } from '../types/database-queue-types';
-import { GameStatusEnum } from '../types/websocket-types';
+import Bull from "bull";
+import { PrismaClient, PieceType, Color, GameStatus } from "@prisma/client";
+import { QueueJobTypes } from "../types/database-queue-types";
 
 const prisma = new PrismaClient();
+const REDIS_URL = process.env.REDIS_URL;
 
 export interface CreateMoveJob {
     gameId: string;
@@ -14,7 +14,7 @@ export interface CreateMoveJob {
     toX: number;
     toY: number;
     piece: PieceType | string;
-    captured?: PieceType | string | null;
+    captured?: { piece: PieceType | string; capturedBy: Color }[] | null;
     isCheck?: boolean;
     isCheckMate?: boolean;
 }
@@ -32,140 +32,192 @@ export interface EndGameJob {
     endedAt?: string;
 }
 
-const DEFAULT_JOB_OPTIONS: Bull.JobOptions = {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 1000 },
-    removeOnComplete: 100,
-    removeOnFail: 1000,
-};
+interface JobOption {
+    attempts: number;
+    delay: number;
+    removeOnComplete: number;
+    removeOnFail: number;
+}
 
 export default class DatabaseQueue {
-    private queue: Bull.Queue;
+    private databaseQueue: Bull.Queue;
+    private defaultJobOptions: JobOption = {
+        attempts: 3,
+        delay: 1000,
+        removeOnComplete: 100,
+        removeOnFail: 50,
+    };
 
-    constructor(redis_url?: string) {
-        const url = redis_url || process.env.REDIS_URL;
-        this.queue = new Bull('database-operations', { redis: url });
-        this.setup_processors();
-    }
-
-    private setup_processors() {
-
-        this.queue.process(QueueJobTypes.CREATE_MOVE, async (job: Bull.Job) => {
-            const data = job.data as CreateMoveJob;
-            try {
-                const existing = await prisma.move.findFirst({
-                    where: {
-                        gameId: data.gameId,
-                        moveNumber: data.moveNumber
-                    }
-                });
-                if (existing) {
-                    return {
-                        success: true,
-                        skipped: true,
-                    };
-                };
-
-                console.log('playerId from db queue ----------------------------------------------------> ', data.playerId);
-
-                const created = await prisma.move.create({
-                    data: {
-                        gameId: data.gameId,
-                        playerId: data.playerId,
-                        moveNumber: data.moveNumber,
-                        fromX: data.fromX,
-                        fromY: data.fromY,
-                        toX: data.toX,
-                        toY: data.toY,
-                        piece: (data.piece as any),
-                        captured: (data.captured as any) || null,
-                        isCheck: !!data.isCheck,
-                        isCheckmate: !!data.isCheckMate,
-                    },
-                });
-
-                return {
-                    success: true,
-                    move: created,
-                }
-            } catch (error) {
-                console.error('create move processor err ', error);
-                throw error;
-            }
+    constructor() {
+        this.databaseQueue = new Bull("database-operations", {
+            redis: REDIS_URL,
         });
+        this.setupProcessors();
+    }
 
-        this.queue.process(QueueJobTypes.UPDATE_GAME_STATE, async (job: Bull.Job) => {
-            const data = job.data as UpdateGameStateJob;
-            try {
-                await prisma.game.upsert({
-                    where: { id: data.gameId },
-                    update: {
-                        boardState: data.boardState,
-                        currentTurn: data.currentTurn ? (data.currentTurn?.toString().toUpperCase() as Color) : undefined,
-                        status: data.status as GameStatus,
-                    },
-                    create: {
-                        id: data.gameId,
-                        boardState: data.boardState,
-                        currentTurn: data.currentTurn ? (data.currentTurn?.toString().toUpperCase() as Color) : "WHITE", // fallback
-                        status: (data.status as GameStatus) || GameStatus.WAITING,
-                    },
-                });
+    private setupProcessors() {
+        this.databaseQueue.process(
+            QueueJobTypes.CREATE_MOVE,
+            this.createMoveProcessor.bind(this),
+        );
 
-                return { success: true };
-            } catch (error) {
-                console.error("update game processor error: ", error);
-                throw error;
+        this.databaseQueue.process(
+            QueueJobTypes.UPDATE_GAME_STATE,
+            this.updateGameStateProcessor.bind(this),
+        );
+
+        this.databaseQueue.process(
+            QueueJobTypes.END_GAME,
+            this.endGameProcessor.bind(this),
+        );
+    }
+
+    // <-------------------------------- processors -------------------------------->
+
+    private async createMoveProcessor(job: Bull.Job) {
+        try {
+            const data: CreateMoveJob = job.data;
+
+            const existing = await prisma.move.findFirst({
+                where: {
+                    gameId: data.gameId,
+                    moveNumber: data.moveNumber,
+                },
+            });
+
+            if (existing) {
+                return { success: true, skipped: true };
             }
-        });
 
+            const created = await prisma.move.create({
+                data: {
+                    gameId: data.gameId,
+                    playerId: data.playerId,
+                    moveNumber: data.moveNumber,
+                    fromX: data.fromX,
+                    fromY: data.fromY,
+                    toX: data.toX,
+                    toY: data.toY,
+                    piece: data.piece as PieceType,
+                    captured: null,
+                    isCheck: !!data.isCheck,
+                    isCheckmate: !!data.isCheckMate,
+                },
+            });
 
-        this.queue.process(QueueJobTypes.END_GAME, async (job: Bull.Job) => {
-            const data = job.data as EndGameJob;
-            try {
-                await prisma.game.update({
-                    where: {
-                        id: data.gameId,
-                    },
-                    data: {
-                        status: data?.winner ? GameStatusEnum.ENDED : GameStatusEnum.IN_PROGRESS,
-                        endedAt: data.endedAt ? new Date(data.endedAt) : new Date(),
-                        winner: data.winner || null,
-                    } as any,
-                });
+            console.log('inside create move 1');
 
-                return {
-                    success: true,
-                }
-            } catch (error) {
-                console.error('end game procc err: ', error);
-                throw error;
+            if (data.captured && data.captured.length > 0) {
+                console.log('inside create move 2');
+                const capturedData = data.captured.map((p) => ({
+                    gameId: data.gameId,
+                    moveId: created.id,
+                    piece: p.piece as PieceType,
+                    color: p.capturedBy as Color,
+                }));
+                console.log('inside move captured data is ', capturedData);
+                await prisma.capturedPiece.createMany({
+                    data: capturedData,
+                })
             }
-        });
+
+            return { success: true, move: created };
+        } catch (error) {
+            console.error("Error while processing create move: ", error);
+            return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+        }
     }
 
-    public async enqueue_create_move(payload: CreateMoveJob, opts?: Bull.JobOptions) {
-        return this.queue.add(QueueJobTypes.CREATE_MOVE, payload, { jobId: `${payload.gameId}:move:${payload.moveNumber}`, ...DEFAULT_JOB_OPTIONS, ...opts });
+    private async updateGameStateProcessor(job: Bull.Job) {
+        try {
+            const data: UpdateGameStateJob = job.data;
+
+            await prisma.game.upsert({
+                where: { id: data.gameId },
+                update: {
+                    boardState: data.boardState,
+                    currentTurn: data.currentTurn
+                        ? (data.currentTurn.toString().toUpperCase() as Color)
+                        : undefined,
+                    status: data.status as GameStatus,
+                },
+                create: {
+                    id: data.gameId,
+                    boardState: data.boardState,
+                    currentTurn: data.currentTurn
+                        ? (data.currentTurn.toString().toUpperCase() as Color)
+                        : "WHITE",
+                    status: (data.status as GameStatus) || GameStatus.WAITING,
+                },
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error("Error while processing update game state: ", error);
+            return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+        }
     }
 
-    public async enqueue_update_game_staet(payload: UpdateGameStateJob, opts?: Bull.JobOptions) {
-        return this.queue.add(QueueJobTypes.UPDATE_GAME_STATE, payload, { jobId: `${payload.gameId}:update`, ...DEFAULT_JOB_OPTIONS, ...opts });
+    private async endGameProcessor(job: Bull.Job) {
+        try {
+            const data: EndGameJob = job.data;
+
+            await prisma.game.update({
+                where: { id: data.gameId },
+                data: {
+                    status: data?.winner ? GameStatus.ENDED : GameStatus.IN_PROGRESS,
+                    endedAt: data.endedAt ? new Date(data.endedAt) : new Date(),
+                    winner: data.winner as Color,
+                },
+            });
+
+            return { success: true };
+        } catch (error) {
+            console.error("Error while processing end game: ", error);
+            return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+        }
     }
 
 
-    public async enqueue_end_game(payload: EndGameJob, opts?: Bull.JobOptions) {
-        return this.queue.add(QueueJobTypes.END_GAME, payload, { jobId: `${payload.gameId}:end`, ...DEFAULT_JOB_OPTIONS, ...opts });
+    // <-------------------------------- enqueue calls -------------------------------->
+
+    public async createMove(payload: CreateMoveJob, options?: Partial<JobOption>) {
+        return this.databaseQueue
+            .add(
+                QueueJobTypes.CREATE_MOVE,
+                payload,
+                { jobId: `${payload.gameId}:move:${payload.moveNumber}`, ...this.defaultJobOptions, ...options },
+            )
+            .catch((error) => console.error("Failed to enqueue create move: ", error));
     }
 
-    public async fetch_game(gameId: string) {
+    public async updateGameState(payload: UpdateGameStateJob, options?: Partial<JobOption>) {
+        return this.databaseQueue
+            .add(
+                QueueJobTypes.UPDATE_GAME_STATE,
+                payload,
+                { jobId: `${payload.gameId}:update`, ...this.defaultJobOptions, ...options },
+            )
+            .catch((error) => console.error("Failed to enqueue update game state: ", error));
+    }
+
+    public async endGame(payload: EndGameJob, options?: Partial<JobOption>) {
+        return this.databaseQueue
+            .add(
+                QueueJobTypes.END_GAME,
+                payload,
+                { jobId: `${payload.gameId}:end`, ...this.defaultJobOptions, ...options },
+            )
+            .catch((error) => console.error("Failed to enqueue end game: ", error));
+    }
+
+    public async fetchGame(gameId: string) {
         try {
             const game = await prisma.game.findUnique({
                 where: { id: gameId },
                 include: {
-                    moves: {
-                        orderBy: { moveNumber: "asc" }
-                    }
-                }
+                    moves: { orderBy: { moveNumber: "asc" } },
+                },
             });
 
             if (!game) return null;
@@ -180,30 +232,28 @@ export default class DatabaseQueue {
                 moves: game.moves,
             };
         } catch (error) {
-            console.error("fetch_game error:", error);
+            console.error("Error while fetching game: ", error);
             throw error;
         }
     }
 
-    public async fetch_moves(gameId: string) {
+    public async fetchMoves(gameId: string) {
         try {
-            const moves = await prisma.move.findMany({
+            return await prisma.move.findMany({
                 where: { gameId },
                 orderBy: { moveNumber: "asc" },
             });
-
-            return moves;
         } catch (error) {
-            console.error("fetch_moves error:", error);
+            console.error("Error while fetching moves: ", error);
             throw error;
         }
     }
 
     public async close() {
         try {
-            await this.queue.close();
-        } catch (e) {
-            console.warn("Error closing queue", e);
+            await this.databaseQueue.close();
+        } catch (error) {
+            console.warn("Error closing database queue: ", error);
         }
     }
 }

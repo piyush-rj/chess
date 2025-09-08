@@ -38,8 +38,9 @@ model Game {
   whitePlayer   User?   @relation("WhitePlayer", fields: [whitePlayerId], references: [id])
   blackPlayer   User?   @relation("BlackPlayer", fields: [blackPlayerId], references: [id])
 
-  boardState Json?
-  moves      Move[]
+  boardState     Json?
+  moves          Move[]
+  capturedPieces CapturedPiece[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -52,6 +53,19 @@ model Game {
   @@map("games")
 }
 
+model CapturedPiece {
+  id     String @id @default(cuid())
+  gameId String
+  game   Game   @relation(fields: [gameId], references: [id])
+
+  piece  PieceType
+  color  Color
+  moveId String
+  move   Move      @relation(fields: [moveId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
 model Move {
   id     String @id @default(cuid())
   gameId String
@@ -60,13 +74,14 @@ model Move {
   playerId String
   player   User   @relation(fields: [playerId], references: [id])
 
-  moveNumber Int
-  fromX      Int
-  fromY      Int
-  toX        Int
-  toY        Int
-  piece      PieceType
-  captured   PieceType?
+  moveNumber     Int
+  fromX          Int
+  fromY          Int
+  toX            Int
+  toY            Int
+  piece          PieceType
+  captured       PieceType?
+  capturedPieces CapturedPiece[]
 
   isCheck     Boolean    @default(false)
   isCheckmate Boolean    @default(false)
@@ -93,6 +108,7 @@ enum GameStatus {
   DRAW
   ABANDONED
   IN_PROGRESS
+  ENDED
 }
 
 enum Color {

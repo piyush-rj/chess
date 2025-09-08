@@ -210,8 +210,8 @@ export class Pawn extends Piece {
         const { x, y } = position;
         const moves: Position[] = [];
 
-        const direction = this.color === "white" ? -1 : 1;
-        const start_row = this.color === "white" ? 6 : 1;
+        const direction = this.color === "WHITE" ? -1 : 1;
+        const start_row = this.color === "WHITE" ? 6 : 1;
 
 
         if (is_inside_board(x, y + direction) && !board.get_piece(x, y + direction)) {

@@ -3,72 +3,71 @@ import { devtools } from "zustand/middleware";
 import { Color, GameState, Position } from "../types/types";
 
 export interface GameStore {
-    player_id: string;
-    game_id: string;
-    player_color: Color;
-    is_connected: boolean;
-    connection_error: string | null;
+    playerId: string;
+    gameId: string;
+    playerColor: Color;
+    isConnected: boolean;
+    connectionError: string | null;
 
-    game_state: GameState | null;
-    selected_square: Position | null;
-    valid_moves: Position[];
+    gameState: GameState | null;
+    selectedSquare: Position | null;
+    validMoves: Position[];
 
-    set_player_id: (id: string) => void;
-    set_game_id: (id: string) => void;
-    set_player_color: (color: Color) => void;
-    set_connection_status: (connected: boolean) => void;
-    set_connection_error: (error: string | null) => void;
+    setPlayerId: (id: string) => void;
+    setGameId: (id: string) => void;
+    setPlayerColor: (color: Color) => void;
+    setConnectionStatus: (connected: boolean) => void;
+    setConnectionError: (error: string | null) => void;
 
-    set_game_state: (state: GameState) => void;
-    set_selected_square: (position: Position | null) => void;
-    set_valid_moves: (moves: Position[]) => void;
+    setGameState: (state: GameState) => void;
+    setSelectedSquare: (position: Position | null) => void;
+    setValidMoves: (moves: Position[]) => void;
 
-    clear_selection: () => void;
-    reset_game: () => void;
+    clearSelection: () => void;
+    resetGame: () => void;
 }
 
-const initial_state: Omit<GameStore, keyof GameStore & string> = {
-    player_id: "",
-    game_id: "",
-    player_color: "white",
-    is_connected: false,
-    connection_error: null,
+const initialState: Omit<GameStore, keyof GameStore & string> = {
+    playerId: "",
+    gameId: "",
+    playerColor: "WHITE",
+    isConnected: false,
+    connectionError: null,
 
-    game_state: null,
-    selected_square: null,
-    valid_moves: [],
+    gameState: null,
+    selectedSquare: null,
+    validMoves: [],
 };
 
-export const use_game_store = create<GameStore>()(
+export const useChessGameStore = create<GameStore>()(
     devtools(
         (set, get) => ({
-            ...initial_state,
+            ...initialState,
 
-            // Connection actions
-            set_player_id: (id: string) => set({ player_id: id }),
-            set_game_id: (id: string) => set({ game_id: id }),
-            set_player_color: (color: Color) => set({ player_color: color }),
-            set_connection_status: (connected: boolean) =>
-                set({ is_connected: connected }),
-            set_connection_error: (error: string | null) =>
-                set({ connection_error: error }),
+            setPlayerId: (id: string) => set({ playerId: id }),
+            setGameId: (id: string) => set({ gameId: id }),
+            setPlayerColor: (color: Color) => set({ playerColor: color }),
+            setConnectionStatus: (connected: boolean) =>
+                set({ isConnected: connected }),
+            setConnectionError: (error: string | null) =>
+                set({ connectionError: error }),
 
-            // game actions
-            set_game_state: (state: GameState) => set({ game_state: state }),
-            set_selected_square: (position: Position | null) =>
-                set({ selected_square: position }),
-            set_valid_moves: (moves: Position[]) => set({ valid_moves: moves }),
+            // Game actions
+            setGameState: (state: GameState) => set({ gameState: state }),
+            setSelectedSquare: (position: Position | null) =>
+                set({ selectedSquare: position }),
+            setValidMoves: (moves: Position[]) => set({ validMoves: moves }),
 
-            clear_selection: () =>
+            clearSelection: () =>
                 set({
-                    selected_square: null,
-                    valid_moves: [],
+                    selectedSquare: null,
+                    validMoves: [],
                 }),
 
-            reset_game: () =>
+            resetGame: () =>
                 set({
-                    ...initial_state,
-                    player_id: get().player_id,
+                    ...initialState,
+                    playerId: get().playerId,
                 }),
         }),
         {

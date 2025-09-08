@@ -26,11 +26,11 @@ export class Board {
         ];
 
         for (let i = 0; i < 8; i++) {
-            board[0]![i] = Piece.create_piece("black", piece_order[i]!);
-            board[1]![i] = Piece.create_piece("black", PieceTypeEnum.PAWN);
+            board[0]![i] = Piece.create_piece("BLACK", piece_order[i]!);
+            board[1]![i] = Piece.create_piece("BLACK", PieceTypeEnum.PAWN);
 
-            board[7]![i] = Piece.create_piece("white", piece_order[i]!);
-            board[6]![i] = Piece.create_piece("white", PieceTypeEnum.PAWN);
+            board[7]![i] = Piece.create_piece("WHITE", piece_order[i]!);
+            board[6]![i] = Piece.create_piece("WHITE", PieceTypeEnum.PAWN);
         }
 
 

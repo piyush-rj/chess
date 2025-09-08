@@ -1,19 +1,29 @@
 import express from "express";
-import { createServer } from "http";
-import { WebSocketServer } from "ws";
+import http from "http";
+import cors from "cors";
+import dotenv from "dotenv";
 import router from "./src/routes";
-import { ChessGameWSHandler } from "./src/ChessGame/chess-game-class/ChessGameWSHandler";
-import { init_services } from "./src/services/init-services";
+import initServices from "./src/services/init-services";
+import { ChessWebSocketServer } from "./src/socket/ChessWebSocketServer";
 
+dotenv.config();
 const PORT = process.env.PORT;
-const app = express();
-const server = createServer(app);
-init_services();
 
-const wss = new WebSocketServer({ server });
-new ChessGameWSHandler(wss);
+const app = express();
+const server = http.createServer(app);
 
 app.use(express.json());
+app.use(cors({
+    origin: "*"
+}));
+
+
 app.use("/api/v1", router);
 
-server.listen(PORT, () => console.log(`server running on port ${PORT}`));
+initServices();
+new ChessWebSocketServer(server);
+
+
+server.listen(PORT, () => {
+    console.log(`server running on ${PORT}`)
+});

@@ -2,28 +2,28 @@
 import { useState, useEffect } from "react";
 import { PIECE_COMPONENTS } from "../../lib/pieces";
 import { Position } from "../../types/types";
-import { use_game_store } from "@/src/store/useChessGameStore";
+import { useChessGameStore } from "@/src/store/useChessGameStore";
 
 type Props = {
     makeMove: (from: Position, to: Position) => void;
 };
 
 export default function ChessBoard({ makeMove }: Props) {
-    const { game_state, player_color } = use_game_store();
+    const { gameState, playerColor } = useChessGameStore();
     const [selected, setSelected] = useState<Position | null>(null);
 
     useEffect(() => {
         setSelected(null);
-    }, [game_state?.board]);
+    }, [gameState?.board]);
 
-    if (!game_state?.board) return null;
-    if (!Array.isArray(game_state?.board)) {
-        console.warn("Invalid board:", game_state?.board);
+    if (!gameState?.board) return null;
+    if (!Array.isArray(gameState?.board)) {
+        console.warn("Invalid board:", gameState?.board);
         return null;
     }
 
     function handleClick(x: number, y: number) {
-        const clickedPiece = game_state?.board[y][x];
+        const clickedPiece = gameState?.board[y][x];
 
         if (selected) {
             makeMove(selected, { x, y });
@@ -31,7 +31,7 @@ export default function ChessBoard({ makeMove }: Props) {
             return;
         }
 
-        if (clickedPiece && clickedPiece.color === player_color) {
+        if (clickedPiece && clickedPiece.color === playerColor) {
             setSelected({ x, y });
         }
     }
@@ -39,11 +39,11 @@ export default function ChessBoard({ makeMove }: Props) {
     return (
         <div className="inline-block border-2 border-neutral-800 rounded-sm overflow-hidden">
             <div className="grid grid-cols-8 gap-0 ">
-                {game_state.board.map((row, y) =>
+                {gameState.board.map((row, y) =>
                     row.map((piece, x) => {
                         const isDark = (x + y) % 2 === 1;
                         const isSelected = selected?.x === x && selected?.y === y;
-                        const key = piece ? `${piece.color}_${piece.type.toLowerCase()}` : null;
+                        const key = piece ? `${piece.color.toLowerCase()}_${piece.type.toLowerCase()}` : null;
                         const PieceComp = key ? PIECE_COMPONENTS[key] : null;
 
                         return (
@@ -61,7 +61,7 @@ export default function ChessBoard({ makeMove }: Props) {
                                 {PieceComp && (
                                     <PieceComp
                                         className={`
-                                            ${piece?.color === "white" ? "text-neutral-950 fill-neutral-300 drop-shadow-xl size-10" : "text-[#bdbdbd] fill-black size-10 drop-shadow-xl"}
+                                            ${piece?.color === "WHITE" ? "text-neutral-950 fill-neutral-300 drop-shadow-xl size-10" : "text-[#bdbdbd] fill-black size-10 drop-shadow-xl"}
                                             ${isSelected ? "scale-110" : ""}
                                             transition-transform duration-200
                                         `}
